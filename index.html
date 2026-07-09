@@ -45,6 +45,1243 @@
         }
     </style>
 </head>
+<body class="h-screen w-screen m-0 p-0 md:overflow-hidden overflow-x-hidden overflow-y-auto bg-slate-50">
+    <div id="root" class="h-full w-full flex flex-col"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // Custom SVGs rendered directly to avoid external requests
+        const SVG = {
+            Back: () => (
+                <svg className="w-5 h-5 inline-block mr-1 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+            ),
+            Home: () => (
+                <svg className="w-5 h-5 inline-block mr-1 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+            ),
+            Refresh: () => (
+                <svg className="w-4 h-4 inline-block mr-1 animate-spin pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 12H18M4 9h9M4 9l4-4"></path>
+                </svg>
+            ),
+            Redo: () => (
+                <svg className="w-5 h-5 inline-block mr-1 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 12H18M4 9h9M4 9l4-4"></path>
+                </svg>
+            ),
+            Check: () => (
+                <svg className="w-6 h-6 text-green-600 inline-block pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M5 13l4 4L19 7"></path>
+                </svg>
+            ),
+            Cross: () => (
+                <svg className="w-6 h-6 text-red-600 inline-block pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            ),
+            OctopusCard: () => (
+                <svg className="w-12 h-12 text-orange-500 pointer-events-none" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="2" y="4" width="20" height="16" rx="3" fill="currentColor" />
+                    <circle cx="8" cy="12" r="3" fill="#ffffff" opacity="0.4" />
+                    <circle cx="16" cy="12" r="3" fill="#ffffff" opacity="0.4" />
+                    <rect x="11" y="9" width="2" height="6" fill="#ffffff" rx="1" transform="rotate(45 12 12)" />
+                </svg>
+            ),
+            Trophy: () => (
+                <svg className="w-16 h-16 text-yellow-500 mx-auto pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5a2 2 0 10-2 2h2zm-2 4h4M5 8h14a2 2 0 012 2v3a7 7 0 01-7 7H10a7 7 0 01-7-7v-3a2 2 0 012-2z"></path>
+                </svg>
+            )
+        };
+
+        // Unique dynamic question generator for Directed Numbers
+        function generateQuestion(mode) {
+            let num1 = 0;
+            let num2 = 0;
+            let op = '+';
+            let expressionStr = '';
+            let val = 0;
+            let explanation = '';
+            let type = '';
+
+            if (mode === 'octopus') {
+                const isPositive = Math.random() > 0.5;
+                if (isPositive) {
+                    num1 = Math.floor(Math.random() * 8) + 2; 
+                    num2 = Math.floor(Math.random() * 8) + 2; 
+                    op = '+';
+                    val = num1 + num2;
+                    expressionStr = `${num1} + ${num2}`;
+                    explanation = `增值 $${num1}，再增值 $${num2}。同方向增加：累計得到 $${val}。`;
+                } else {
+                    num1 = -(Math.floor(Math.random() * 8) + 2); 
+                    num2 = Math.floor(Math.random() * 8) + 2; 
+                    op = '-';
+                    val = num1 - num2;
+                    expressionStr = `${num1} - ${num2}`;
+                    explanation = `欠款 $${Math.abs(num1)}（記為 ${num1}），再扣減 $${num2}。同向扣減：累計為 ${val}。`;
+                }
+                type = 'octopus';
+            } else {
+                const template = Math.floor(Math.random() * 4);
+                num1 = Math.floor(Math.random() * 11) - 5; 
+                if (num1 === 0) num1 = 3; 
+                num2 = Math.floor(Math.random() * 8) + 2; 
+
+                switch (template) {
+                    case 0: // a + (-b)
+                        val = num1 - num2;
+                        expressionStr = `${num1} + (-${num2})`;
+                        explanation = `正負得負：${num1} + (-${num2}) 簡化為 ${num1} - ${num2} = ${val}。`;
+                        break;
+                    case 1: // a - (-b)
+                        val = num1 + num2;
+                        expressionStr = `${num1} - (-${num2})`;
+                        explanation = `負負得正：${num1} - (-${num2}) 簡化為 ${num1} + ${num2} = ${val}。`;
+                        break;
+                    case 2: // -a + b
+                        num1 = -Math.abs(num1);
+                        val = num1 + num2;
+                        expressionStr = `(${num1}) + ${num2}`;
+                        explanation = `從 ${num1} 開始，向右移動 ${num2} 格。結果為 ${val}。`;
+                        break;
+                    case 3: // -a - (+b)
+                        num1 = -Math.abs(num1);
+                        val = num1 - num2;
+                        expressionStr = `(${num1}) - (+${num2})`;
+                        explanation = `正負得負：${num1} - (+${num2}) 簡化為 ${num1} - ${num2} = ${val}。`;
+                        break;
+                }
+                type = 'directed';
+            }
+
+            let rawSum = Math.abs(num1) + Math.abs(num2);
+            let rawDiff = Math.abs(Math.abs(num1) - Math.abs(num2));
+            
+            const optionsSet = new Set();
+            optionsSet.add(val);
+            optionsSet.add(rawSum);
+            optionsSet.add(-rawSum);
+            optionsSet.add(rawDiff);
+            optionsSet.add(-rawDiff);
+
+            let safetyOffset = 1;
+            while (optionsSet.size < 4) {
+                optionsSet.add(val + safetyOffset);
+                optionsSet.add(val - safetyOffset);
+                safetyOffset++;
+            }
+
+            const options = Array.from(optionsSet).slice(0, 4);
+            options.sort(() => Math.random() - 0.5);
+
+            return {
+                num1,
+                num2,
+                op,
+                expression: expressionStr,
+                answer: val,
+                options,
+                explanation,
+                type
+            };
+        }
+
+        // --- DYNAMIC VISUAL COMPONENT (SAFEGUARDED AGAINST NULL REFERENCES) ---
+        const VisualAid = ({ question, showAnswer }) => {
+            if (!question) return null;
+
+            if (question.type === 'octopus') {
+                const total = question.answer;
+                return (
+                    <div className="flex flex-col items-center justify-center bg-orange-50 border-2 border-dashed border-orange-300 rounded-xl p-2 w-full h-full flex-1 min-h-0 max-h-[140px]">
+                        <div className="flex items-center gap-2 mb-1">
+                            <SVG.OctopusCard />
+                            <div className="text-left">
+                                <p className="text-[10px] font-black text-orange-600">八達通模擬系統</p>
+                                <p className="text-sm font-extrabold text-slate-800">交易式同號累積</p>
+                            </div>
+                        </div>
+                        <div className="flex justify-around items-center w-full max-w-sm mt-1 text-xs">
+                            <div className="text-center bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 min-w-[70px]">
+                                <span className="block text-[9px] font-bold text-slate-500 mb-0.5">初始狀態</span>
+                                <span className={`text-sm font-black ${question.num1 >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {question.num1 >= 0 ? `+$${question.num1}` : `-$${Math.abs(question.num1)}`}
+                                </span>
+                            </div>
+                            <div className="font-black text-slate-400 text-sm">➔</div>
+                            <div className="text-center bg-white p-1.5 rounded-lg shadow-sm border border-slate-200 min-w-[70px]">
+                                <span className="block text-[9px] font-bold text-slate-500 mb-0.5">交易操作</span>
+                                <span className={`text-sm font-black ${question.op === '+' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {question.op === '+' ? `+$${Math.abs(question.num2)}` : `-$${Math.abs(question.num2)}`}
+                                </span>
+                            </div>
+                            <div className="font-black text-slate-400 text-sm">➔</div>
+                            <div className="text-center bg-orange-100 p-1.5 rounded-lg shadow-inner border border-orange-200 min-w-[70px]">
+                                <span className="block text-[9px] font-bold text-orange-700 mb-0.5">最終餘額</span>
+                                {showAnswer ? (
+                                    <span className={`text-sm font-black ${total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {total >= 0 ? `+$${total}` : `-$${Math.abs(total)}`}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-black text-slate-500 animate-pulse bg-slate-200 px-2 py-0.5 rounded">
+                                        $ ?
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // COMPACT NUMBER LINE VISUALIZATION (OPTIMIZED HEIGHT FOR CLASSROOM WHITEBOARDS)
+            const maxVal = 10;
+            const minVal = -10;
+            const range = maxVal - minVal;
+
+            const getX = (val) => {
+                const percentage = (val - minVal) / range;
+                return 40 + percentage * 720;
+            };
+
+            const startX = getX(0);
+            const num1X = getX(question.num1);
+            const answerX = getX(question.answer);
+
+            const ticks = [];
+            for (let i = minVal; i <= maxVal; i++) {
+                ticks.push(i);
+            }
+
+            return (
+                <div className="w-full h-full flex-1 min-h-0 bg-blue-50 border-2 border-dashed border-blue-300 rounded-xl p-1.5 flex flex-col justify-center items-center max-h-[140px] overflow-hidden">
+                    <div className="text-[10px] font-black text-blue-700 mb-1">數線幾何對照演示</div>
+                    <svg className="w-full h-full max-h-[80px]" viewBox="0 0 800 90" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg">
+                        <line x1="30" y1="50" x2="770" y2="50" stroke="#1e293b" strokeWidth="2.5" strokeLinecap="round" />
+                        <polygon points="770,46 780,50 770,54" fill="#1e293b" />
+                        <polygon points="30,46 20,50 30,54" fill="#1e293b" />
+
+                        {ticks.map((tick) => (
+                            <g key={tick}>
+                                <line x1={getX(tick)} y1="45" x2={getX(tick)} y2="55" stroke="#475569" strokeWidth="1.5" />
+                                <text 
+                                    x={getX(tick)} 
+                                    y="75" 
+                                    textAnchor="middle" 
+                                    className={`text-[11px] font-bold ${tick === 0 ? 'fill-slate-900 font-black text-[13px]' : 'fill-slate-500'}`}
+                                >
+                                    {tick}
+                                </text>
+                                {tick === 0 && <circle cx={getX(tick)} cy="50" r="3" fill="#000000" />}
+                            </g>
+                        ))}
+
+                        {question.num1 !== 0 && (
+                            <g>
+                                <path 
+                                    d={`M ${startX} 50 Q ${(startX + num1X)/2} 20 ${num1X} 50`} 
+                                    fill="none" 
+                                    stroke="#ec4899" 
+                                    strokeWidth="2.5" 
+                                    strokeDasharray="4 4"
+                                />
+                                <polygon points={`${num1X},50 ${num1X - (num1X > startX ? 7 : -7)},43 ${num1X - (num1X > startX ? 3 : -3)},50`} fill="#ec4899" />
+                                <text x={(startX + num1X)/2} y="14" textAnchor="middle" className="text-[10px] font-black fill-pink-600">
+                                    {question.num1 > 0 ? `+${question.num1}` : question.num1}
+                                </text>
+                            </g>
+                        )}
+
+                        {num1X !== answerX && (
+                            <g>
+                                <path 
+                                    d={`M ${num1X} 50 Q ${(num1X + answerX)/2} 5 ${answerX} 50`} 
+                                    fill="none" 
+                                    stroke={answerX > num1X ? '#059669' : '#dc2626'} 
+                                    strokeWidth="3.5" 
+                                />
+                                <polygon 
+                                    points={`${answerX},50 ${answerX - (answerX > num1X ? 8 : -8)},38 ${answerX - (answerX > num1X ? 4 : -4)},50`} 
+                                    fill={answerX > num1X ? '#059669' : '#dc2626'} 
+                                />
+                                <text x={(num1X + answerX)/2} y="8" textAnchor="middle" className={`text-[10px] font-black ${answerX > num1X ? 'fill-emerald-700' : 'fill-red-700'}`}>
+                                    {answerX > num1X ? '往右 ➔' : '往左 ➔'} ({question.answer - question.num1 > 0 ? `+${question.answer - question.num1}` : question.answer - question.num1})
+                                </text>
+                            </g>
+                        )}
+
+                        <circle cx={answerX} cy="50" r="5" fill="#2563eb" className="animate-pulse" />
+                        <rect x={answerX - 12} y="78" width="24" height="12" rx="2" fill="#2563eb" />
+                        <text x={answerX} y="87" textAnchor="middle" className="text-[8px] font-bold fill-white">落點</text>
+                    </svg>
+                </div>
+            );
+        };
+
+        // --- TUG OF WAR SVG SIMULATION ---
+        const TugOfWarSVG = ({ deltaScore }) => {
+            const offset = deltaScore * 15;
+            const centerPoint = 300 + offset;
+
+            return (
+                <div className="w-full max-w-lg mx-auto bg-slate-800 rounded-lg p-1.5 border border-slate-900 shadow-sm shrink-0">
+                    <div className="flex justify-between items-center text-[10px] font-bold text-slate-300 mb-0.5 px-2">
+                        <span className="text-red-400">◀ 紅方</span>
+                        <span className="bg-slate-700 px-2 py-0.5 rounded text-white font-black text-[9px]">
+                            {deltaScore === 0 ? "勢均力敵" : deltaScore > 0 ? `紅領先 ${deltaScore}` : `藍領先 ${Math.abs(deltaScore)}`}
+                        </span>
+                        <span className="text-blue-400">藍方 ➔</span>
+                    </div>
+                    
+                    <svg className="w-full h-[40px] bg-slate-950 rounded overflow-visible" viewBox="0 0 600 45" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+                        <line x1="300" y1="0" x2="300" y2="45" stroke="#f43f5e" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.3" />
+                        <line x1="20" y1="22" x2="580" y2="22" stroke="#e2e8f0" strokeWidth="3" strokeLinecap="round" />
+
+                        {/* Central red knot */}
+                        <g transform={`translate(${centerPoint}, 22)`}>
+                            <rect x="-4" y="-8" width="8" height="16" fill="#e11d48" rx="1.5" className="animate-pulse" />
+                            <polygon points="-4,-4 0,-8 4,-4 0,8" fill="#facc15" />
+                        </g>
+
+                        {/* 4 Red Stickmen */}
+                        {[50, 90, 130, 170].map((dist, i) => (
+                            <g key={`red-${i}`} transform={`translate(${centerPoint - dist}, 22)`} className="transition-transform duration-300">
+                                <line x1="8" y1="0" x2="16" y2="-8" stroke="#ef4444" strokeWidth="2.5" />
+                                <circle cx="18" cy="-11" r="4.5" fill="#ef4444" />
+                                <line x1="12" y1="-3" x2="55" y2="0" stroke="#ef4444" strokeWidth="2" />
+                                <line x1="8" y1="0" x2="-2" y2="12" stroke="#ef4444" strokeWidth="2.5" />
+                            </g>
+                        ))}
+
+                        {/* 4 Blue Stickmen */}
+                        {[50, 90, 130, 170].map((dist, i) => (
+                            <g key={`blue-${i}`} transform={`translate(${centerPoint + dist}, 22) scale(-1, 1)`} className="transition-transform duration-300">
+                                <line x1="8" y1="0" x2="16" y2="-8" stroke="#3b82f6" strokeWidth="2.5" />
+                                <circle cx="18" cy="-11" r="4.5" fill="#3b82f6" />
+                                <line x1="12" y1="-3" x2="55" y2="0" stroke="#3b82f6" strokeWidth="2" />
+                                <line x1="8" y1="0" x2="-2" y2="12" stroke="#3b82f6" strokeWidth="2.5" />
+                            </g>
+                        ))}
+                    </svg>
+                </div>
+            );
+        };
+
+        // --- MAIN APP COMPONENT ---
+        function App() {
+            const [view, setView] = useState('menu');
+            const [currentMode, setCurrentMode] = useState('octopus'); // 'octopus' | 'directed'
+            
+            // Game State (Single Player)
+            const [currentQuestion, setCurrentQuestion] = useState(null);
+            const [questionIndex, setQuestionIndex] = useState(1);
+            const [singleScore, setSingleScore] = useState(0);
+            const [isAnswered, setIsAnswered] = useState(false);
+            const [selectedChoice, setSelectedChoice] = useState(null);
+            const [wrongQuestions, setWrongQuestions] = useState([]);
+            const [streak, setStreak] = useState(0);
+            const [showHint, setShowHint] = useState(false);
+            
+            // Stats trackers for Infinite Mode
+            const [totalAnswered, setTotalAnswered] = useState(0);
+            const [correctCount, setCorrectCount] = useState(0);
+
+            // Dual Player Game State
+            const [dualScore, setDualScore] = useState(0); 
+            const [dualRound, setDualRound] = useState(1);
+            const [dualWinner, setDualWinner] = useState(null);
+            const [dualStatus, setDualStatus] = useState({
+                redClicked: null,
+                blueClicked: null,
+                isLock: false,
+                revealed: false // FIXED: New state to prevent showing answer on wrong guess
+            });
+
+            // Review Mode state
+            const [reviewIndex, setReviewIndex] = useState(0);
+            const [reviewWrongQuestions, setReviewWrongQuestions] = useState([]);
+            const [reviewSelectedChoice, setReviewSelectedChoice] = useState(null);
+            const [reviewAnswered, setReviewAnswered] = useState(false);
+            const [showReviewExplainer, setShowReviewExplainer] = useState(false);
+            const [reviewShowHint, setReviewShowHint] = useState(false);
+
+            // Global 30-Second Countdown Timer
+            const [timeLeft, setTimeLeft] = useState(30);
+
+            // Master countdown effect
+            useEffect(() => {
+                if (view !== 'single' && view !== 'dual') return;
+                if (timeLeft <= 0) {
+                    handleGlobalTimeout();
+                    return;
+                }
+
+                const timer = setTimeout(() => {
+                    setTimeLeft(prev => prev - 1);
+                }, 1000);
+
+                return () => clearTimeout(timer);
+            }, [timeLeft, view]);
+
+            // --- CRITICAL REFACTOR: 100% Robust Home navigation reset ---
+            const handleBackToMenu = (e) => {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                
+                // 1. Instantly transition view to prevent rendering sub-components under invalid states
+                setView('menu');
+                
+                // 2. Safely clear all active play configurations
+                setQuestionIndex(1);
+                setSingleScore(0);
+                setIsAnswered(false);
+                setSelectedChoice(null);
+                setStreak(0);
+                setShowHint(false);
+                setTotalAnswered(0);
+                setCorrectCount(0);
+                setDualScore(0);
+                setDualRound(1);
+                setDualWinner(null);
+                setDualStatus({ redClicked: null, blueClicked: null, isLock: false, revealed: false });
+                setTimeLeft(30);
+                
+                // 3. Reset review states
+                setReviewIndex(0);
+                setReviewSelectedChoice(null);
+                setReviewAnswered(false);
+                setShowReviewExplainer(false);
+                setReviewShowHint(false);
+            };
+
+            // Initialize Single Player (30s Time-Attack)
+            const startSinglePlayer = (modeType) => {
+                setCurrentMode(modeType);
+                setQuestionIndex(1);
+                setSingleScore(0);
+                setWrongQuestions([]);
+                setStreak(0);
+                setIsAnswered(false);
+                setSelectedChoice(null);
+                setTotalAnswered(0);
+                setCorrectCount(0);
+                setShowHint(false);
+                setTimeLeft(30);
+                
+                const q = generateQuestion(modeType);
+                setCurrentQuestion(q);
+                setView('single');
+            };
+
+            // Initialize Dual Player (30s Time-Attack)
+            const startDualPlayer = (modeType) => {
+                setCurrentMode(modeType);
+                setDualScore(0);
+                setDualRound(1);
+                setDualWinner(null);
+                setDualStatus({ redClicked: null, blueClicked: null, isLock: false, revealed: false });
+                setTimeLeft(30);
+                
+                const q = generateQuestion(modeType);
+                setCurrentQuestion(q);
+                setView('dual');
+            };
+
+            // Handle when global 30s timer hits 0
+            const handleGlobalTimeout = () => {
+                if (view === 'single') {
+                    setView('single-ended');
+                } else if (view === 'dual') {
+                    if (dualScore > 0) concludeDualMatch('Red');
+                    else if (dualScore < 0) concludeDualMatch('Blue');
+                    else concludeDualMatch('Draw');
+                }
+            };
+
+            // Single player choice action with auto-advance transition on correct
+            const handleSingleChoice = (choice) => {
+                if (isAnswered) return;
+                setSelectedChoice(choice);
+                setIsAnswered(true);
+                setTotalAnswered(prev => prev + 1);
+
+                const isCorrect = choice === currentQuestion.answer;
+                if (isCorrect) {
+                    setSingleScore(prev => prev + 10);
+                    setStreak(prev => prev + 1);
+                    setCorrectCount(prev => prev + 1);
+                    
+                    // Auto-advance after 0.5s if correct
+                    setTimeout(() => {
+                        advanceSinglePlayer();
+                    }, 500);
+                } else {
+                    setWrongQuestions(prev => {
+                        if (prev.some(q => q.expression === currentQuestion.expression)) return prev;
+                        return [...prev, currentQuestion];
+                    });
+                    setStreak(0);
+                }
+            };
+
+            // Draw next question in Single Player
+            const advanceSinglePlayer = () => {
+                setQuestionIndex(prev => prev + 1);
+                setIsAnswered(false);
+                setSelectedChoice(null);
+                setShowHint(false);
+                const q = generateQuestion(currentMode);
+                setCurrentQuestion(q);
+            };
+
+            // --- FIXED: Dual player choice action with punishment mechanics ---
+            const handleDualChoice = (player, choice) => {
+                if (dualStatus.isLock) return;
+
+                const isCorrect = choice === currentQuestion.answer;
+                let newScore = dualScore;
+
+                if (player === 'Red') {
+                    if (dualStatus.redClicked !== null) return;
+                    
+                    if (isCorrect) {
+                        newScore = dualScore + 1;
+                        setDualScore(newScore);
+                        setDualStatus(prev => ({
+                            ...prev,
+                            redClicked: choice,
+                            isLock: true,
+                            revealed: true // Show green answer
+                        }));
+                        
+                        setTimeout(() => {
+                            if (newScore >= 4) {
+                                concludeDualMatch('Red');
+                            } else {
+                                advanceDualPlayer();
+                            }
+                        }, 1000); 
+                    } else {
+                        // Penalty: Blue pulls (Blue gets a point)
+                        newScore = dualScore - 1;
+                        setDualScore(newScore);
+                        setDualStatus(prev => ({
+                            ...prev,
+                            redClicked: choice,
+                            isLock: true,
+                            revealed: false // DO NOT show correct answer, just block interactions
+                        }));
+                        
+                        if (newScore <= -4) {
+                            setTimeout(() => concludeDualMatch('Blue'), 500); 
+                        } else {
+                            setTimeout(() => {
+                                setDualStatus(prev => ({
+                                    ...prev,
+                                    redClicked: null, // Reset to null so it turns white again
+                                    isLock: false // Release lock after 0.5s penalty
+                                }));
+                            }, 500); 
+                        }
+                    }
+                } else {
+                    if (dualStatus.blueClicked !== null) return;
+                    
+                    if (isCorrect) {
+                        newScore = dualScore - 1;
+                        setDualScore(newScore);
+                        setDualStatus(prev => ({
+                            ...prev,
+                            blueClicked: choice,
+                            isLock: true,
+                            revealed: true // Show green answer
+                        }));
+                        
+                        setTimeout(() => {
+                            if (newScore <= -4) {
+                                concludeDualMatch('Blue');
+                            } else {
+                                advanceDualPlayer();
+                            }
+                        }, 1000); 
+                    } else {
+                        // Penalty: Red pulls (Red gets a point)
+                        newScore = dualScore + 1;
+                        setDualScore(newScore);
+                        setDualStatus(prev => ({
+                            ...prev,
+                            blueClicked: choice,
+                            isLock: true,
+                            revealed: false // DO NOT show correct answer
+                        }));
+                        
+                        if (newScore >= 4) {
+                            setTimeout(() => concludeDualMatch('Red'), 500);
+                        } else {
+                            setTimeout(() => {
+                                setDualStatus(prev => ({
+                                    ...prev,
+                                    blueClicked: null, // Reset to null so it turns white again
+                                    isLock: false
+                                }));
+                            }, 500); 
+                        }
+                    }
+                }
+            };
+
+            // Advance Dual Player Game to next round
+            const advanceDualPlayer = () => {
+                setDualRound(prev => prev + 1);
+                setDualStatus({ redClicked: null, blueClicked: null, isLock: false, revealed: false });
+                const q = generateQuestion(currentMode);
+                setCurrentQuestion(q);
+            };
+
+            const concludeDualMatch = (winner) => {
+                setDualWinner(winner);
+                setView('dual-ended');
+            };
+
+            // --- REVIEW SYSTEM ---
+            const startReviewMode = () => {
+                if (wrongQuestions.length === 0) return;
+                setReviewWrongQuestions([...wrongQuestions]);
+                setReviewIndex(0);
+                setReviewSelectedChoice(null);
+                setReviewAnswered(false);
+                setShowReviewExplainer(false);
+                setReviewShowHint(false);
+                setView('review');
+            };
+
+            const handleReviewChoice = (choice) => {
+                if (reviewAnswered) return;
+                setReviewSelectedChoice(choice);
+                const currentWrongQ = reviewWrongQuestions[reviewIndex];
+                if (!currentWrongQ) return;
+                const isCorrect = choice === currentWrongQ.answer;
+
+                if (isCorrect) {
+                    setReviewAnswered(true);
+                    setShowReviewExplainer(false);
+                } else {
+                    setShowReviewExplainer(true);
+                }
+            };
+
+            const retryCurrentReviewQuestion = () => {
+                setReviewSelectedChoice(null);
+                setShowReviewExplainer(false);
+            };
+
+            const advanceReviewQuestion = () => {
+                if (reviewIndex + 1 >= reviewWrongQuestions.length) {
+                    setWrongQuestions([]);
+                    setView('single-ended');
+                } else {
+                    setReviewIndex(prev => prev + 1);
+                    setReviewSelectedChoice(null);
+                    setReviewAnswered(false);
+                    setShowReviewExplainer(false);
+                    setReviewShowHint(false);
+                }
+            };
+
+            return (
+                <div className="flex-1 flex flex-col w-full h-full relative overflow-x-hidden">
+                    
+                    {/* TOP HEADER */}
+                    <header className="bg-slate-900 text-white py-3 px-4 flex justify-between items-center shadow-md border-b-4 border-black">
+                        <div className="flex items-center gap-2">
+                            <span className="bg-orange-500 text-black font-black px-2 py-0.5 rounded border-2 border-black text-xs md:text-sm">
+                                中一數學 🎯
+                            </span>
+                            <h1 className="text-base md:text-2xl font-black tracking-wide">有向數加減互動教學</h1>
+                        </div>
+                        {view !== 'menu' && (
+                            <button 
+                                onClick={handleBackToMenu} 
+                                className="bg-rose-600 hover:bg-rose-700 text-white font-black px-4 py-2 rounded-2xl border-4 border-black hover:translate-y-0.5 transition shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex items-center text-sm md:text-base z-50 cursor-pointer pointer-events-auto"
+                            >
+                                <SVG.Back /> 返回選單
+                            </button>
+                        )}
+                    </header>
+
+                    {/* MAIN CONTAINER OPTIMIZED FOR IPAD & WHITEBOARD PROJECTION */}
+                    <main className="flex-1 p-3 w-full flex flex-col justify-start max-w-4xl mx-auto">
+                        
+                        {/* --- MENU SCREEN --- */}
+                        {view === 'menu' && (
+                            <div className="flex-1 flex flex-col items-center justify-center w-full py-4 max-w-2xl mx-auto">
+                                <div className="text-center mb-6">
+                                    <h2 className="text-2xl md:text-4xl font-black text-slate-800 tracking-tight mb-2">
+                                        選擇教學模式與玩法
+                                    </h2>
+                                    <p className="text-slate-600 text-sm md:text-lg font-bold px-4">
+                                        白板大字版對抗：30秒極限挑戰！答錯停頓 0.5 秒，答對鎖定 1 秒！
+                                    </p>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full px-4">
+                                    
+                                    {/* OCTOPUS CARD */}
+                                    <div className="bg-white rounded-3xl border-4 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="bg-orange-100 p-2 rounded-2xl border-2 border-black">
+                                                    <SVG.OctopusCard />
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-slate-900">1. 八達通模式</h3>
+                                                    <span className="bg-orange-100 text-orange-800 text-xs font-bold px-2 py-0.5 rounded border-2 border-orange-300">相同符號加減</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-slate-600 text-sm font-medium leading-normal mb-3.5">
+                                                日常增值與扣款。作答前保持最終餘額隱藏，提升心算自主度。
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button 
+                                                onClick={() => startSinglePlayer('octopus')}
+                                                className="bg-orange-50 hover:bg-orange-100 text-orange-600 border-2 border-orange-400 font-black py-4 rounded-xl shadow-[3px_3px_0px_0px_rgba(249,115,22,1)] active:translate-y-0.5 text-center text-lg md:text-xl"
+                                            >
+                                                單人 30s 挑戰
+                                            </button>
+                                            <button 
+                                                onClick={() => startDualPlayer('octopus')}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 text-center text-lg md:text-xl"
+                                            >
+                                                雙人 30s 拔河
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* DIRECTED NUMBER CARD */}
+                                    <div className="bg-white rounded-3xl border-4 border-black p-5 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] hover:translate-y-0.5 hover:shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] transition-all flex flex-col justify-between">
+                                        <div>
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <div className="bg-blue-100 p-2 rounded-2xl border-2 border-black flex items-center justify-center">
+                                                    <svg className="w-10 h-10 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path>
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-xl font-black text-slate-900">2. 有向數模式</h3>
+                                                    <span className="bg-blue-100 text-blue-800 text-xs font-bold px-2 py-0.5 rounded border-2 border-blue-300">異號數與括號化簡</span>
+                                                </div>
+                                            </div>
+                                            <p className="text-slate-600 text-sm font-medium leading-normal mb-3.5">
+                                                異號數與括號化簡。單人挑戰可點選數線，雙人對戰禁用提示。
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button 
+                                                onClick={() => startSinglePlayer('directed')}
+                                                className="bg-orange-50 hover:bg-orange-100 text-orange-600 border-2 border-orange-400 font-black py-4 rounded-xl shadow-[3px_3px_0px_0px_rgba(249,115,22,1)] active:translate-y-0.5 text-center text-lg md:text-xl"
+                                            >
+                                                單人 30s 挑戰
+                                            </button>
+                                            <button 
+                                                onClick={() => startDualPlayer('directed')}
+                                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl border-2 border-black shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 text-center text-lg md:text-xl"
+                                            >
+                                                雙人 30s 拔河
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- SINGLE PLAYER MODE (WHITEBOARD MASSIVE DISPLAY) --- */}
+                        {view === 'single' && currentQuestion && (
+                            <div className="w-full flex-1 flex flex-col justify-between py-1 max-w-2xl mx-auto">
+                                
+                                {/* Top Progress Header */}
+                                <div className="flex justify-between items-center bg-slate-800 text-white p-3 rounded-2xl border-4 border-black mb-3 shadow-md">
+                                    <div className="font-black text-sm md:text-base">
+                                        第 {questionIndex} 題
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs md:text-sm">
+                                        <span className="font-black bg-orange-500 text-slate-900 px-2.5 py-0.5 rounded border border-black">連勝 ⚡ {streak}</span>
+                                        <span className="font-black bg-slate-700 text-yellow-300 px-2.5 py-0.5 rounded border border-black">
+                                            {correctCount}/{totalAnswered} 答對
+                                        </span>
+                                        <span className="font-black text-yellow-300 text-base">得分: {singleScore}</span>
+                                    </div>
+                                    <div className="flex items-center">
+                                        <span className={`font-black text-lg md:text-xl px-2.5 py-0.5 rounded border border-black ${timeLeft <= 10 ? 'bg-red-600 text-white animate-bounce' : 'bg-slate-900 text-green-400'}`}>
+                                            {timeLeft}s
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Dynamic Visual Display */}
+                                <div className="mb-3">
+                                    {currentMode === 'octopus' ? (
+                                        <VisualAid question={currentQuestion} showAnswer={isAnswered} />
+                                    ) : (
+                                        showHint ? (
+                                            <div className="relative">
+                                                <VisualAid question={currentQuestion} showAnswer={isAnswered} />
+                                                <button 
+                                                    onClick={() => setShowHint(false)}
+                                                    className="absolute top-2 right-2 bg-slate-800 text-white text-xs font-black px-3 py-1 rounded hover:bg-slate-700 border-2 border-slate-600"
+                                                >
+                                                    隱藏數線
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="w-full bg-slate-100 border-4 border-dashed border-slate-300 rounded-2xl p-4 flex flex-col justify-center items-center h-[100px] md:h-[120px]">
+                                                <span className="text-slate-500 font-black mb-2 text-sm text-center">
+                                                    💡 需要幾何數線提示嗎？
+                                                </span>
+                                                <button
+                                                    onClick={() => setShowHint(true)}
+                                                    className="bg-blue-600 hover:bg-blue-700 text-white font-black py-1.5 px-4 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition text-xs"
+                                                >
+                                                    顯示數線提示 ➔
+                                                </button>
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+
+                                {/* MASSIVE QUESTION DISPLAY FOR whiteboard */}
+                                <div className="bg-white rounded-3xl border-4 border-black p-4 text-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] mb-4">
+                                    <p className="text-slate-400 font-black text-xs uppercase tracking-wider mb-1">請計算</p>
+                                    <h3 className="text-5xl sm:text-7xl lg:text-8xl font-black text-slate-900 tracking-wider">
+                                        {currentQuestion.expression} = ?
+                                    </h3>
+                                </div>
+
+                                {/* OPTION BUTTONS AREA - SCALED DOWN SLIGHTLY AS REQUESTED */}
+                                <div className="grid grid-cols-2 gap-4 mb-4">
+                                    {currentQuestion.options.map((opt, idx) => {
+                                        const isCorrectOpt = opt === currentQuestion.answer;
+                                        const isSelectedOpt = opt === selectedChoice;
+                                        
+                                        let btnStyle = "bg-white text-slate-800 border-slate-700 hover:bg-slate-150";
+                                        
+                                        if (isAnswered) {
+                                            if (isCorrectOpt) {
+                                                btnStyle = "bg-green-500 text-white border-green-700";
+                                            } else if (isSelectedOpt) {
+                                                btnStyle = "bg-red-500 text-white border-red-700 animate-shake";
+                                            } else {
+                                                btnStyle = "bg-slate-100 text-slate-400 border-slate-200 opacity-60";
+                                            }
+                                        }
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                disabled={isAnswered}
+                                                onClick={() => handleSingleChoice(opt)}
+                                                className={`text-3xl sm:text-4xl lg:text-5xl font-black py-3 sm:py-5 rounded-2xl border-4 ${btnStyle} shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all flex justify-center items-center`}
+                                            >
+                                                {opt}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Explanation Bottom Sheet */}
+                                {isAnswered && selectedChoice !== currentQuestion.answer && (
+                                    <div className="bg-white rounded-2xl border-4 border-black p-4 shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] flex flex-col sm:flex-row justify-between items-center gap-3 animate-fade-in">
+                                        <div className="text-left flex-1 text-sm leading-tight">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <span className="bg-red-100 text-red-800 text-xs font-black px-2 py-0.5 rounded border-2 border-red-300 flex items-center">
+                                                    <SVG.Cross /> 答錯
+                                                </span>
+                                                <span className="text-slate-800 font-extrabold text-base">正確答案： {currentQuestion.answer}</span>
+                                            </div>
+                                            <p className="text-slate-600 font-bold text-sm leading-relaxed">
+                                                {currentQuestion.explanation}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={advanceSinglePlayer}
+                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-4 py-2 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 text-xs"
+                                        >
+                                            下一題 ➔
+                                        </button>
+                                    </div>
+                                )}
+
+                            </div>
+                        )}
+
+                        {/* --- DUAL PLAYER MODE (TUG OF WAR) - FIXED ANSWER REVEAL LOGIC & SCALED DOWN BUTTONS --- */}
+                        {view === 'dual' && currentQuestion && (
+                            <div className="w-full flex-1 flex flex-col justify-start py-1 px-2 max-w-6xl mx-auto min-h-0">
+                                
+                                {/* Header / Rope */}
+                                <div className="shrink-0 mb-1.5 w-full">
+                                    <TugOfWarSVG deltaScore={dualScore} />
+                                    <div className="flex justify-between items-center bg-slate-900 text-white py-0.5 px-3 rounded-md border border-black mt-1">
+                                        <span className="text-[10px] font-black text-rose-400">紅方: {dualScore > 0 ? `+${dualScore}` : 0}</span>
+                                        <span className={`text-xs md:text-sm font-black ${timeLeft <= 10 ? 'text-red-400' : 'text-green-400'}`}>ROUND {dualRound} | ⏰ {timeLeft}s</span>
+                                        <span className="text-[10px] font-black text-blue-400">藍方: {dualScore < 0 ? `+${Math.abs(dualScore)}` : 0}</span>
+                                    </div>
+                                </div>
+
+                                {/* 3:6:3 Main Layout - Fills exactly available space without scrolling */}
+                                <div className="grid grid-cols-1 md:grid-cols-12 gap-2 flex-1 min-h-0 w-full pb-1">
+                                    
+                                    {/* RED CONTROLS (col-span-3: 25% width) */}
+                                    <div className="col-span-1 md:col-span-3 bg-red-50 border-2 border-red-500 rounded-xl p-1.5 flex flex-col shadow-[2px_2px_0px_0px_rgba(239,68,68,1)] min-h-0">
+                                        <div className="text-center shrink-0 mb-1">
+                                            <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full block mx-auto max-w-[80px]">紅搶答</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1.5 flex-1 min-h-0">
+                                            {currentQuestion.options.map((opt, idx) => {
+                                                const isClicked = dualStatus.redClicked === opt;
+                                                const isCorrect = opt === currentQuestion.answer;
+                                                let btnClass = "bg-white text-slate-900 border-red-200 hover:bg-red-100";
+                                                
+                                                if (dualStatus.revealed) {
+                                                    btnClass = isCorrect ? "bg-green-500 text-white border-green-600 scale-102 z-10" : "bg-white text-transparent border-transparent opacity-0 pointer-events-none";
+                                                } else if (isClicked) {
+                                                    btnClass = "bg-red-500 text-white border-red-700 opacity-90 animate-shake";
+                                                }
+
+                                                return (
+                                                    <button key={idx} disabled={dualStatus.isLock || dualStatus.redClicked === opt} onClick={() => handleDualChoice('Red', opt)}
+                                                        className={`text-2xl md:text-3xl font-black rounded-lg border-2 ${btnClass} transition-all active:translate-y-0.5 shadow-sm flex justify-center items-center h-full min-h-0`}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* CENTER DISPLAY (col-span-6: 50% width) */}
+                                    <div className="col-span-1 md:col-span-6 bg-white border-2 border-black rounded-xl p-1.5 flex flex-col shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] min-h-0">
+                                        <div className="w-full text-center py-1 bg-slate-50 rounded-lg border border-slate-200 mb-1 shrink-0">
+                                            <p className="text-[9px] font-black text-slate-400 tracking-wider">共同對抗題</p>
+                                            <h3 className="text-3xl md:text-4xl lg:text-5xl font-black text-slate-800">
+                                                {currentQuestion.expression} = ?
+                                            </h3>
+                                        </div>
+                                        
+                                        <div className="w-full flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+                                            {currentMode === 'octopus' ? (
+                                                <VisualAid question={currentQuestion} showAnswer={dualStatus.revealed} />
+                                            ) : (
+                                                <div className="text-center p-2 bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg w-full h-full flex flex-col justify-center items-center">
+                                                    <span className="text-3xl block mb-1">⚔️</span>
+                                                    <span className="text-slate-700 font-extrabold text-sm block">雙人有向數對抗</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {dualStatus.isLock && dualStatus.revealed && (
+                                            <div className="shrink-0 w-full bg-emerald-50 border border-emerald-500 text-emerald-800 text-[10px] font-bold py-1 rounded text-center mt-1.5 animate-pulse">
+                                                🎉 判定完成！
+                                            </div>
+                                        )}
+                                        {dualStatus.isLock && !dualStatus.revealed && (
+                                            <div className="shrink-0 w-full bg-red-50 border border-red-500 text-red-800 text-[10px] font-bold py-1 rounded text-center mt-1.5 animate-shake">
+                                                ❌ 答錯扣分！對方拉過去了！
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* BLUE CONTROLS (col-span-3: 25% width) */}
+                                    <div className="col-span-1 md:col-span-3 bg-blue-50 border-2 border-blue-500 rounded-xl p-1.5 flex flex-col shadow-[2px_2px_0px_0px_rgba(59,130,246,1)] min-h-0">
+                                        <div className="text-center shrink-0 mb-1">
+                                            <span className="bg-blue-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full block mx-auto max-w-[80px]">藍搶答</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1.5 flex-1 min-h-0">
+                                            {currentQuestion.options.map((opt, idx) => {
+                                                const isClicked = dualStatus.blueClicked === opt;
+                                                const isCorrect = opt === currentQuestion.answer;
+                                                let btnClass = "bg-white text-slate-900 border-blue-200 hover:bg-blue-100";
+                                                
+                                                if (dualStatus.revealed) {
+                                                    btnClass = isCorrect ? "bg-green-500 text-white border-green-600 scale-102 z-10" : "bg-white text-transparent border-transparent opacity-0 pointer-events-none";
+                                                } else if (isClicked) {
+                                                    btnClass = "bg-red-500 text-white border-red-700 opacity-90 animate-shake";
+                                                }
+
+                                                return (
+                                                    <button key={idx} disabled={dualStatus.isLock || dualStatus.blueClicked === opt} onClick={() => handleDualChoice('Blue', opt)}
+                                                        className={`text-2xl md:text-3xl font-black rounded-lg border-2 ${btnClass} transition-all active:translate-y-0.5 shadow-sm flex justify-center items-center h-full min-h-0`}
+                                                    >
+                                                        {opt}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        )}
+
+                        {/* --- SINGLE PLAYER END REPORT SCREEN --- */}
+                        {view === 'single-ended' && (
+                            <div className="max-w-md mx-auto w-full bg-white rounded-2xl border-4 border-black p-5 text-center shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] my-auto">
+                                <SVG.Trophy />
+                                <h2 className="text-2xl md:text-3xl font-black text-slate-800 mt-2 mb-1">單人挑戰時間到！</h2>
+                                <p className="text-slate-500 font-bold text-xs mb-3">做得好！你在 30 秒內完成了以下成績：</p>
+                                
+                                <div className="bg-slate-50 rounded-xl border-2 border-slate-300 p-2.5 mb-3 text-sm">
+                                    <div className="grid grid-cols-3 gap-1">
+                                        <div className="text-center">
+                                            <span className="block text-[10px] font-bold text-slate-400">最終得分</span>
+                                            <span className="text-xl font-black text-blue-600">{singleScore}</span>
+                                        </div>
+                                        <div className="text-center border-l border-slate-200">
+                                            <span className="block text-[10px] font-bold text-slate-400">答對題數</span>
+                                            <span className="text-xl font-black text-emerald-600">{correctCount}/{totalAnswered}</span>
+                                        </div>
+                                        <div className="text-center border-l border-slate-200">
+                                            <span className="block text-[10px] font-bold text-slate-400">收集錯題</span>
+                                            <span className="text-xl font-black text-rose-600">{wrongQuestions.length}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-2.5">
+                                    {wrongQuestions.length > 0 && (
+                                        <button
+                                            onClick={startReviewMode}
+                                            className="w-full bg-yellow-400 hover:bg-yellow-500 text-slate-900 font-black py-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition flex items-center justify-center gap-1.5 text-xs"
+                                        >
+                                            <SVG.Redo /> 重溫錯誤 ({wrongQuestions.length} 題)
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => startSinglePlayer(currentMode)}
+                                        className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black py-2.5 rounded-xl border-2 border-black shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition text-xs"
+                                    >
+                                        重新作答
+                                    </button>
+                                    <button
+                                        onClick={handleBackToMenu}
+                                        className="w-full bg-slate-800 hover:bg-slate-900 text-white font-black py-2 rounded-xl border border-black active:translate-y-0.5 transition text-xs"
+                                    >
+                                        返回主選單
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- DUAL PLAYER END REPORT SCREEN --- */}
+                        {view === 'dual-ended' && (
+                            <div className="max-w-md mx-auto w-full bg-white rounded-xl border-4 border-black p-4 text-center shadow-[3px_3px_0px_0px_rgba(0,0,0,1)] my-auto">
+                                
+                                <div className="transform scale-95 my-2 transition-transform duration-500">
+                                    <TugOfWarSVG deltaScore={dualScore} />
+                                </div>
+
+                                <h2 className="text-lg md:text-2xl font-black mt-3 mb-0.5 tracking-tight">
+                                    {dualWinner === 'Red' && <span className="text-red-600">🎉 紅方獲勝!</span>}
+                                    {dualWinner === 'Blue' && <span className="text-blue-600">🎉 藍方獲勝!</span>}
+                                    {dualWinner === 'Draw' && <span className="text-slate-600">🤝 雙方平手!</span>}
+                                </h2>
+                                
+                                <p className="text-slate-500 font-bold text-xs mb-3">
+                                    {dualWinner === 'Draw' ? "雙方平分秋色！再來一盤分出高下！" : "恭喜勝出！拉力拔河完美展現心算力！"}
+                                </p>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-w-xs mx-auto">
+                                    <button
+                                        onClick={() => startDualPlayer(currentMode)}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-black py-2 rounded-lg border border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition text-xs"
+                                    >
+                                        再來一局
+                                    </button>
+                                    <button
+                                        onClick={handleBackToMenu}
+                                        className="bg-slate-800 hover:bg-slate-900 text-white font-black py-2 rounded-lg border border-black active:translate-y-0.5 transition text-xs"
+                                    >
+                                        返回選單
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* --- REVIEW WRONG QUESTIONS STATE MACHINE --- */}
+                        {view === 'review' && reviewWrongQuestions && reviewWrongQuestions.length > 0 && reviewWrongQuestions[reviewIndex] && (
+                            <div className="max-w-md mx-auto w-full flex-1 flex flex-col justify-between py-1">
+                                
+                                {/* Top review status bar */}
+                                <div className="flex justify-between items-center bg-yellow-400 text-slate-900 py-1.5 px-3 rounded-lg border border-black mb-2.5 shadow-sm">
+                                    <div className="font-black text-xs">
+                                        重溫錯題: <span className="text-rose-600">{reviewIndex + 1} / {reviewWrongQuestions.length}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                        <span className="bg-white text-slate-900 font-extrabold text-[9px] px-2 py-0.2 rounded-full border border-black">
+                                            重溫模式 🔄
+                                        </span>
+                                    </div>
+                                    <button 
+                                        onClick={() => setView('single-ended')}
+                                        className="text-[9px] font-black bg-slate-950 hover:bg-slate-800 text-white px-2 py-0.5 rounded border border-black active:translate-y-0.5"
+                                    >
+                                        結束
+                                    </button>
+                                </div>
+
+                                {/* Dynamic helper logic with hint toggle */}
+                                <div className="mb-2.5">
+                                    {reviewWrongQuestions[reviewIndex].type === 'octopus' ? (
+                                        <VisualAid question={reviewWrongQuestions[reviewIndex]} showAnswer={reviewAnswered} />
+                                    ) : (
+                                        reviewShowHint ? (
+                                            <div className="relative">
+                                                <VisualAid question={reviewWrongQuestions[reviewIndex]} showAnswer={reviewAnswered} />
+                                                <button 
+                                                    onClick={() => setReviewShowHint(false)}
+                                                    className="absolute top-1.5 right-1.5 bg-slate-800 text-white text-[9px] font-bold px-1.5 py-0.5 rounded hover:bg-slate-700 border border-slate-600"
+                                                >
+                                                    隱藏數線
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            <div className="w-full bg-amber-50 border border-dashed border-amber-300 rounded-xl p-2.5 flex flex-col justify-center items-center h-[100px]">
+                                                <p className="text-amber-800 font-bold text-[9px] mb-2">需要數線輔助思考嗎？</p>
+                                                <button
+                                                    onClick={() => setReviewShowHint(true)}
+                                                    className="bg-amber-500 hover:bg-amber-600 text-white font-black py-1 px-3 rounded-md border border-black text-[9px] active:translate-y-0.5"
+                                                >
+                                                    顯示數線提示 ➔
+                                                </button>
+                                            </div>
+                                        )
+                                    )}
+                                </div>
+
+                                {/* Current formula */}
+                                <div className="bg-white rounded-xl border-4 border-black p-2.5 text-center shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] mb-2.5">
+                                    <p className="text-amber-600 font-black text-[10px] mb-0.5">重新挑戰此題</p>
+                                    <h3 className="text-3xl font-black text-slate-800">
+                                        {reviewWrongQuestions[reviewIndex].expression} = ?
+                                    </h3>
+                                </div>
+
+                                {/* Multi-choice buttons */}
+                                <div className="grid grid-cols-2 gap-2 mb-2.5">
+                                    {reviewWrongQuestions[reviewIndex].options.map((opt, idx) => {
+                                        const isCorrect = opt === reviewWrongQuestions[reviewIndex].answer;
+                                        const isSelected = opt === reviewSelectedChoice;
+
+                                        let btnStyle = "bg-white text-slate-800 border-slate-700 hover:bg-amber-50";
+
+                                        if (reviewAnswered) {
+                                            if (isCorrect) {
+                                                btnStyle = "bg-green-500 text-white border-green-700 pointer-events-none";
+                                            } else {
+                                                btnStyle = "bg-slate-100 text-slate-400 border-slate-200 opacity-50 pointer-events-none";
+                                            }
+                                        } else if (reviewSelectedChoice !== null) {
+                                            if (isSelected) {
+                                                btnStyle = "bg-red-500 text-white border-red-700 animate-shake";
+                                            }
+                                        }
+
+                                        return (
+                                            <button
+                                                key={idx}
+                                                disabled={reviewAnswered || showReviewExplainer}
+                                                onClick={() => handleReviewChoice(opt)}
+                                                className={`text-xl md:text-3xl font-black py-2.5 rounded-xl border-4 ${btnStyle} shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 transition-all flex justify-center items-center`}
+                                            >
+                                                {opt}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Smart Explanation / Retry Action Box */}
+                                {showReviewExplainer && (
+                                    <div className="bg-red-50 rounded-lg border border-red-400 p-2 shadow-[1.5px_1.5px_0px_0px_rgba(239,68,68,1)] flex flex-col sm:flex-row justify-between items-center gap-1.5 animate-fade-in">
+                                        <div className="text-left flex-1 text-[10px]">
+                                            <span className="bg-red-100 text-red-800 text-[8px] font-black px-1.5 py-0.2 rounded border border-red-300 flex items-center gap-0.5 w-max">
+                                                ❌ 再次答錯了
+                                            </span>
+                                            <p className="text-slate-800 font-extrabold mt-1">
+                                                提示：同號加減要注意累積方向，異號則要注意正負化簡法則。
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={retryCurrentReviewQuestion}
+                                            className="w-full sm:w-auto bg-yellow-400 hover:bg-yellow-500 text-slate-950 font-black px-2.5 py-1.5 rounded-md border border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 flex items-center justify-center gap-1 text-[9px]"
+                                        >
+                                            <SVG.Refresh /> 重新作答
+                                        </button>
+                                    </div>
+                                )}
+
+                                {reviewAnswered && (
+                                    <div className="bg-emerald-50 rounded-lg border border-emerald-400 p-2 shadow-[1px_1px_0px_0px_rgba(16,185,129,1)] flex flex-col sm:flex-row justify-between items-center gap-1.5 animate-fade-in">
+                                        <div className="text-left flex-1 text-[10px]">
+                                            <span className="bg-green-100 text-green-800 text-[8px] font-black px-1.5 py-0.2 rounded border border-green-300 flex items-center gap-0.5 w-max">
+                                                🎉 答對了！
+                                            </span>
+                                            <p className="text-slate-700 font-bold mt-1">
+                                                {reviewWrongQuestions[reviewIndex].explanation}
+                                            </p>
+                                        </div>
+                                        <button
+                                            onClick={advanceReviewQuestion}
+                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-black px-3 py-1 rounded-md border border-black shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] active:translate-y-0.5 text-[9px]"
+                                        >
+                                            {reviewIndex + 1 >= reviewWrongQuestions.length ? "結束 ➔" : "下一題 ➔"}
+                                        </button>
+                                    </div>
+                                )}
+
+                            </div>
+                        )}
+
+                    </main>
+
+                    {/* BRANDING BOTTOM FOOTER */}
+                    <footer className="bg-slate-900 text-slate-400 text-[9px] py-1.5 text-center border-t border-black font-semibold mt-auto">
+                        有向數加減學與教平台 © 2026 • 專為白板投影演示與行動裝置優化
+                    </footer>
+                </div>
+            );
+        }
+
+        // Render Application
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
+
+
+
+```
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            75% { transform: translateX(4px); }
+        }
+        .animate-shake {
+            animation: shake 0.2s ease-in-out infinite;
+        }
+    </style>
+</head>
 <body class="overflow-y-auto min-h-screen w-screen m-0 p-0">
     <div id="root" class="min-h-screen w-full flex flex-col"></div>
 
